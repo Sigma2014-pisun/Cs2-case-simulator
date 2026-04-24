@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Симулятор кейсов CS2</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#1a1a2e;color:#eee;font-family:'Segoe UI',sans-serif;display:flex;justify-content:center;min-height:100vh;user-select:none;overflow-x:hidden}
+        .app{width:100%;max-width:420px;padding:16px;display:flex;flex-direction:column;gap:16px}
+        .header{display:flex;justify-content:space-between;align-items:center;background:#16213e;padding:14px 18px;border-radius:16px;box-shadow:0 4px 15px rgba(0,0,0,.4)}
+        .balance{font-weight:700;font-size:18px;color:#ffd700}
+        .btn{background:#e94560;color:#fff;border:none;padding:14px 22px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;transition:.2s;touch-action:manipulation}
+        .btn:active{transform:scale(0.96);opacity:.9}
+        .btn:disabled{background:#555;transform:none;opacity:.7}
+        .btn-group{display:flex;gap:10px}
+        .btn-group .btn{flex:1}
+        .case-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .case-card{background:#16213e;border-radius:14px;padding:12px;text-align:center;cursor:pointer;transition:.2s;border:2px solid transparent}
+        .case-card:hover,.case-card.active{border-color:#e94560}
+        .case-icon{font-size:44px}
+        .case-name{font-weight:700;font-size:14px;margin:6px 0}
+        .case-price{color:#aaa;font-size:13px}
+        .case-contents{font-size:10px;color:#777;margin-top:4px}
+        .animation-area{background:#0f0f1a;border-radius:20px;padding:20px;text-align:center;position:relative;min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+        .spinner{font-size:70px;transition:transform .05s;display:inline-block}
+        .result{font-weight:800;font-size:18px;margin-top:8px;text-align:center;min-height:44px}
+        .skin-name{font-size:14px;font-weight:600;margin-top:4px}
+        .inventory-title{font-weight:700;font-size:17px;display:flex;justify-content:space-between;align-items:center}
+        .sort-btn{background:#333;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:11px;cursor:pointer}
+        .inv-grid{display:flex;flex-wrap:wrap;gap:8px;background:#16213e;border-radius:14px;padding:12px;min-height:80px;max-height:200px;overflow-y:auto}
+        .inv-item{background:#0f0f1a;border-radius:10px;padding:8px;text-align:center;width:70px;position:relative;border:2px solid #333;cursor:pointer;transition:.2s}
+        .inv-item:hover{border-color:#fff}
+        .inv-item .emoji{font-size:28px}
+        .inv-item .count{font-size:10px;position:absolute;top:2px;right:4px;background:#e94560;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-weight:700}
+        .inv-item .skin-label{font-size:9px;margin-top:2px;line-height:1.1;max-height:22px;overflow:hidden}
+        .log{font-size:10px;color:#777;text-align:center;min-height:16px}
+        .rarity-legend{display:flex;flex-wrap:wrap;gap:4px;font-size:10px;margin-top:8px}
+        .rarity-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:2px}
+        *{-webkit-tap-highlight-color:transparent}
+        .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:100}
+        .modal-content{background:#1a1a2e;border-radius:16px;padding:20px;max-width:300px;text-align:center}
+        .modal-content h3{margin-bottom:12px}
+        .modal-content button{margin-top:12px}
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="header">
+        <span>📦 CS2 Case Sim</span>
+        <span class="balance">💰 <span id="bal">500</span></span>
+    </div>
+    <div>
+        <div style="font-weight:700;margin-bottom:8px">Выберите кейс:</div>
+        <div class="case-grid" id="caseGrid"></div>
+    </div>
+    <div class="btn-group">
+        <button class="btn" id="openBtn">🔓 ОТКРЫТЬ</button>
+        <button class="btn" id="openManyBtn" style="background:#333">📦 x5</button>
+    </div>
+    <div class="animation-area" id="animArea">
+        <div class="spinner" id="spinner">📦</div>
+        <div class="result" id="result"></div>
+        <div class="skin-name" id="skinName"></div>
+    </div>
+    <div class="log" id="log"></div>
+    <div>
+        <div class="inventory-title">
+            <span>🎒 Инвентарь</span>
+            <span style="font-size:12px;color:#aaa" id="invCount">0 предметов</span>
+        </div>
+        <div class="inv-grid" id="inventory"></div>
+    </div>
+</div>
+
+<script>
+    // Полная система скинов CS2
+    const SKIN_POOLS = {
+        // Кейс «Хромированный» - смешанные скины
+        chroma: [
+            { name: "AWP | Хром", emoji: "🔫", rarity: 0 }, // Ширпотреб
+            { name: "AK-47 | Серый накал", emoji: "🔫", rarity: 0 },
+            { name: "M4A4 | Стальной ливень", emoji: "🔫", rarity: 1 }, // Промышленный
+            { name: "Desert Eagle | Хромированный", emoji: "🔫", rarity: 1 },
+            { name: "USP-S | Блеск", emoji: "🔫", rarity: 2 }, // Спецназ
+            { name: "Glock-18 | Водяной знак", emoji: "🔫", rarity: 3 }, // Засекреченный
+            { name: "AWP | Дракон", emoji: "🐉", rarity: 4 }, // Тайный
+            { name: "Нож «Бабочка» | Хром", emoji: "🦋", rarity: 6 } // Нож
+        ],
+        // Кейс «Призрачный» - более ценные скины
+        phantom: [
+            { name: "M4A1-S | Призрак", emoji: "👻", rarity: 1 },
+            { name: "P250 | Эктоплазма", emoji: "👻", rarity: 1 },
+            { name: "FAMAS | Привидение", emoji: "👻", rarity: 2 },
+            { name: "AWP | Фантом", emoji: "🔫", rarity: 3 },
+            { name: "Desert Eagle | Полтергейст", emoji: "🔫", rarity: 4 },
+            { name: "AK-47 | Дух огня", emoji: "🔥", rarity: 5 }, // Редкий
+            { name: "Перчатки | Призрачные", emoji: "🧤", rarity: 6 }
+        ],
+        // Кейс «Элитный» - премиум скины
+        elite: [
+            { name: "USP-S | Элита", emoji: "💎", rarity: 2 },
+            { name: "P2000 | Империал", emoji: "💎", rarity: 3 },
+            { name: "AWP | Королевский", emoji: "👑", rarity: 4 },
+            { name: "AK-47 | Император", emoji: "👑", rarity: 5 },
+            { name: "M4A4 | Золотой век", emoji: "✨", rarity: 5 },
+            { name: "Нож «Кастет» | Элитный", emoji: "🥊", rarity: 6 },
+            { name: "Перчатки | Королевские", emoji: "🧤", rarity: 6 }
+        ]
+    };
+
+    const RARITIES = [
+        { name: "Ширпотреб", color: "#b0b0b0", emoji: "⬜", chance: 79.92 },
+        { name: "Промышленный", color: "#5b8cde", emoji: "🟦", chance: 15.98 },
+        { name: "Спецназ", color: "#4a4ae6", emoji: "🔵", chance: 3.2 },
+        { name: "Засекреченный", color: "#9b3bdf", emoji: "🟣", chance: 0.64 },
+        { name: "Тайный", color: "#e94d8a", emoji: "🩷", chance: 0.26 },
+        { name: "Редкий", color: "#e94560", emoji: "🔴", chance: 0.06 },
+        { name: "Нож/Перчатки", color: "#ffd700", emoji: "🟡", chance: 0.02 }
+    ];
+
+    const CASES = [
+        { 
+            id: 1, 
+            name: "Кейс «Хромированный»", 
+            price: 100, 
+            emoji: "🔫", 
+            pool: SKIN_POOLS.chroma,
+            description: "Стандартные скины"
+        },
+        { 
+            id: 2, 
+            name: "Кейс «Призрачный»", 
+            price: 200, 
+            emoji: "👻", 
+            pool: SKIN_POOLS.phantom,
+            description: "Редкие скины"
+        },
+        { 
+            id: 3, 
+            name: "Кейс «Элитный»", 
+            price: 350, 
+            emoji: "💎", 
+            pool: SKIN_POOLS.elite,
+            description: "Премиум скины"
+        },
+    ];
+
+    let balance = 500;
+    let inventory = {}; // { "skinName": { ...skinData, count: N } }
+    let selectedCase = CASES[0];
+    let isOpening = false;
+
+    const $bal = document.getElementById("bal");
+    const $caseGrid = document.getElementById("caseGrid");
+    const $openBtn = document.getElementById("openBtn");
+    const $openManyBtn = document.getElementById("openManyBtn");
+    const $spinner = document.getElementById("spinner");
+    const $result = document.getElementById("result");
+    const $skinName = document.getElementById("skinName");
+    const $inventory = document.getElementById("inventory");
+    const $invCount = document.getElementById("invCount");
+    const $log = document.getElementById("log");
+    const $animArea = document.getElementById("animArea");
+
+    function getRandomSkin(pool) {
+        // Сначала определяем редкость
+        let roll = Math.random() * 100;
+        let cumulative = 0;
+        let selectedRarity = 0;
+        
+        for (let i = 0; i < RARITIES.length; i++) {
+            cumulative += RARITIES[i].chance;
+            if (roll <= cumulative) {
+                selectedRarity = i;
+                break;
+            }
+        }
+        
+        // Фильтруем скины подходящей редкости
+        const matchingSkins = pool.filter(skin => skin.rarity === selectedRarity);
+        
+        if (matchingSkins.length === 0) {
+            // Если нет скинов такой редкости, берем ближайшую
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+        
+        return matchingSkins[Math.floor(Math.random() * matchingSkins.length)];
+    }
+
+    function renderCases(){
+        $caseGrid.innerHTML = CASES.map(c=>`<div class="case-card ${c.id===selectedCase.id?'active':''}" data-id="${c.id}">
+            <div class="case-icon">${c.emoji}</div>
+            <div class="case-name">${c.name}</div>
+            <div class="case-price">💰 ${c.price}</div>
+            <div class="case-contents">${c.description}</div>
+        </div>`).join('');
+        
+        document.querySelectorAll('.case-card').forEach(card=>{
+            card.addEventListener('click', ()=>{
+                if(!isOpening){
+                    selectedCase = CASES.find(c=>c.id==card.dataset.id);
+                    renderCases();
+                }
+            });
+        });
+    }
+
+    function renderInventory(){
+        const items = Object.entries(inventory).filter(([_, item]) => item.count > 0);
+        let totalItems = 0;
+        
+        let html = items.map(([key, item]) => {
+            totalItems += item.count;
+            const rarity = RARITIES[item.rarity];
+            return `<div class="inv-item" style="border-color:${rarity.color}">
+                <span class="emoji">${item.emoji}</span>
+                <span class="count">${item.count}</span>
+                <div class="skin-label" style="color:${rarity.color}">${item.name}</div>
+            </div>`;
+        }).join('');
+        
+        $inventory.innerHTML = html || '<div style="color:#666;align-self:center;width:100%;text-align:center">Пусто</div>';
+        $invCount.textContent = `${totalItems} предметов`;
+    }
+
+    function log(msg){$log.textContent=msg;}
+
+    async function openSingleCase() {
+        if(isOpening) return;
+        if(balance < selectedCase.price){
+            log('Недостаточно средств!');
+            return;
+        }
+        
+        isOpening = true;
+        $openBtn.disabled = true;
+        $openManyBtn.disabled = true;
+        balance -= selectedCase.price;
+        $bal.textContent = balance;
+        $result.innerHTML = '';
+        $skinName.innerHTML = '';
+        $animArea.style.background = '#0a0a14';
+
+        const finalSkin = getRandomSkin(selectedCase.pool);
+        const rarity = RARITIES[finalSkin.rarity];
+        
+        // Анимация прокрутки
+        const poolEmojis = [...new Set(selectedCase.pool.map(s => s.emoji))];
+        const totalSpins = 25 + Math.floor(Math.random() * 15);
+        let currentIdx = 0;
+
+        for(let i = 0; i < totalSpins; i++){
+            currentIdx = (currentIdx + 1) % poolEmojis.length;
+            $spinner.textContent = poolEmojis[currentIdx];
+            $spinner.style.transform = `scale(${1 + Math.random() * 0.2})`;
+            await new Promise(r => setTimeout(r, i < totalSpins - 5 ? 40 + (i * 2) : 80 + (i * 5)));
+        }
+
+        // Показываем результат
+        $spinner.textContent = finalSkin.emoji;
+        $spinner.style.transform = 'scale(1.3)';
+        $result.innerHTML = `<span style="color:${rarity.color};font-size:18px">${rarity.name}</span>`;
+        $skinName.innerHTML = `<span style="color:${rarity.color}">${finalSkin.name}</span>`;
+        $animArea.style.background = `radial-gradient(circle, ${rarity.color}22 0%, #0a0a14 70%)`;
+        
+        if(rarity.chance < 1 && navigator.vibrate) navigator.vibrate(200);
+
+        // Добавляем в инвентарь
+        const key = finalSkin.name;
+        if(!inventory[key]) {
+            inventory[key] = {...finalSkin, count: 0};
+        }
+        inventory[key].count++;
+        
+        renderInventory();
+        log(`Выпало: ${finalSkin.name} (${rarity.name})`);
+        
+        isOpening = false;
+        $openBtn.disabled = false;
+        $openManyBtn.disabled = false;
+        setTimeout(() => $spinner.style.transform = 'scale(1)', 300);
+    }
+
+    async function openMultipleCases(count) {
+        if(isOpening) return;
+        if(balance < selectedCase.price * count) {
+            log(`Недостаточно средств для открытия ${count} кейсов!`);
+            return;
+        }
+        
+        isOpening = true;
+        $openBtn.disabled = true;
+        $openManyBtn.disabled = true;
+        
+        const results = [];
+        let totalCost = 0;
+        
+        for(let i = 0; i < count; i++) {
+            if(balance < selectedCase.price) break;
+            
+            balance -= selectedCase.price;
+            totalCost += selectedCase.price;
+            const skin = getRandomSkin(selectedCase.pool);
+            results.push(skin);
+            
+            // Добавляем в инвентарь
+            const key = skin.name;
+            if(!inventory[key]) {
+                inventory[key] = {...skin, count: 0};
+            }
+            inventory[key].count++;
+            
+            $bal.textContent = balance;
+            
+            // Краткая анимация для каждого открытия
+            $spinner.textContent = '🎰';
+            await new Promise(r => setTimeout(r, 100));
+        }
+        
+        // Показываем последний результат
+        const lastSkin = results[results.length - 1];
+        const rarity = RARITIES[lastSkin.rarity];
+        $spinner.textContent = lastSkin.emoji;
+        $result.innerHTML = `<span style="color:${rarity.color}">${rarity.name}</span>`;
+        $skinName.innerHTML = `<span style="color:${rarity.color}">${lastSkin.name}</span>`;
+        $animArea.style.background = `radial-gradient(circle, ${rarity.color}22 0%, #0a0a14 70%)`;
+        
+        // Статистика
+        const rarityCounts = {};
+        results.forEach(s => {
+            const r = RARITIES[s.rarity].name;
+            rarityCounts[r] = (rarityCounts[r] || 0) + 1;
+        });
+        
+        const statsText = Object.entries(rarityCounts)
+            .map(([r, c]) => `${c}x ${r}`)
+            .join(', ');
+        
+        log(`Открыто ${results.length} кейсов: ${statsText}`);
+        renderInventory();
+        
+        isOpening = false;
+        $openBtn.disabled = false;
+        $openManyBtn.disabled = false;
+        setTimeout(() => $spinner.style.transform = 'scale(1)', 300);
+    }
+
+    $openBtn.addEventListener("click", () => openSingleCase());
+    $openManyBtn.addEventListener("click", () => openMultipleCases(5));
+    
+    renderCases();
+    renderInventory();
+    log('Добро пожаловать! Выбирай кейс и открывай скины.');
+</script>
+</body>
+</html>
